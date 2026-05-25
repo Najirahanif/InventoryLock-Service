@@ -1,0 +1,35 @@
+{
+  "name": "inventorylock-service",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "producer": "node order-service/producer.js",
+    "consumer1": "node inventory-service/consumer.js",
+    "consumer2": "node inventory-service/consumer.js",
+    "consumer3": "node inventory-service/consumer.js",
+    "dev": "concurrently \"npm run consumer1\" \"npm run consumer2\" \"npm run consumer3\" \"npm run producer\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Najirahanif/InventoryLock-Service.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Najirahanif/InventoryLock-Service/issues"
+  },
+  "homepage": "https://github.com/Najirahanif/InventoryLock-Service#readme",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "kafkajs": "^2.2.4",
+    "node-zookeeper-client": "^1.1.3",
+    "redis": "^5.12.1",
+    "zookeeper": "^7.2.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
