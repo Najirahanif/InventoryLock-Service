@@ -2,7 +2,14 @@ const { Kafka } = require("kafkajs");
 
 const kafka = new Kafka({
   clientId: "inventory-lock",
-  brokers: ["192.168.1.23:9092"], // Use your broker IP
+  //for single broker
+  // brokers: ["10.55.66.131:9092"], // Use your broker IP
+  // for mulltiple broker
+  brokers: [
+    "10.55.66.131:9092",
+    "10.55.66.131:9093",
+    "10.55.66.131:9094"
+  ],
   ssl: false, // since SASL_PLAINTEXT
   sasl: {
     mechanism: "plain", // Change from scram-sha-256 to plain
