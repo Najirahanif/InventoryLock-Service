@@ -9,11 +9,17 @@ networks:
 # VOLUMES (Persistent Storage)
 # ============================================
 volumes:
-  redis-data:
+  redis-cluster-data-1:
+  redis-cluster-data-2:
+  redis-cluster-data-3:
+  redis-cluster-data-4:
+  redis-cluster-data-5:
+  redis-cluster-data-6:
   kafka-data-1:
   kafka-data-2:
   kafka-data-3:
   zookeeper-data:
+  redisinsight-data: 
 
 # ============================================
 # SERVICES
@@ -21,28 +27,109 @@ volumes:
 services:
 
   # ==========================================
-  # 1. REDIS (Product Stock Database)
+  # REDIS CLUSTER NODES
   # ==========================================
-  redis:
+  redis-master-1:
     image: redis:7-alpine
-    container_name: inventory-redis
-    command: redis-server /usr/local/etc/redis/redis.conf
+    container_name: redis-master-1
+    command: redis-server --port 7001 --cluster-enabled yes --cluster-config-file nodes-7001.conf --cluster-node-timeout 5000 --appendonly yes --protected-mode no --bind 0.0.0.0
     ports:
-      - "6379:6379"
+      - "7001:7001"
+      - "17001:17001"
     volumes:
-      - redis-data:/data
-      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - redis-cluster-data-1:/data
     networks:
       - inventory-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "naji12", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+
+  redis-master-2:
+    image: redis:7-alpine
+    container_name: redis-master-2
+    command: redis-server --port 7002 --cluster-enabled yes --cluster-config-file nodes-7002.conf --cluster-node-timeout 5000 --appendonly yes --protected-mode no --bind 0.0.0.0
+    ports:
+      - "7002:7002"
+      - "17002:17002"
+    volumes:
+      - redis-cluster-data-2:/data
+    networks:
+      - inventory-network
+    restart: unless-stopped
+
+  redis-master-3:
+    image: redis:7-alpine
+    container_name: redis-master-3
+    command: redis-server --port 7003 --cluster-enabled yes --cluster-config-file nodes-7003.conf --cluster-node-timeout 5000 --appendonly yes --protected-mode no --bind 0.0.0.0
+    ports:
+      - "7003:7003"
+      - "17003:17003"
+    volumes:
+      - redis-cluster-data-3:/data
+    networks:
+      - inventory-network
+    restart: unless-stopped
+
+  redis-replica-1:
+    image: redis:7-alpine
+    container_name: redis-replica-1
+    command: redis-server --port 7004 --cluster-enabled yes --cluster-config-file nodes-7004.conf --cluster-node-timeout 5000 --appendonly yes --protected-mode no --bind 0.0.0.0
+    ports:
+      - "7004:7004"
+      - "17004:17004"
+    volumes:
+      - redis-cluster-data-4:/data
+    networks:
+      - inventory-network
+    restart: unless-stopped
+
+  redis-replica-2:
+    image: redis:7-alpine
+    container_name: redis-replica-2
+    command: redis-server --port 7005 --cluster-enabled yes --cluster-config-file nodes-7005.conf --cluster-node-timeout 5000 --appendonly yes --protected-mode no --bind 0.0.0.0
+    ports:
+      - "7005:7005"
+      - "17005:17005"
+    volumes:
+      - redis-cluster-data-5:/data
+    networks:
+      - inventory-network
+    restart: unless-stopped
+
+  redis-replica-3:
+    image: redis:7-alpine
+    container_name: redis-replica-3
+    command: redis-server --port 7006 --cluster-enabled yes --cluster-config-file nodes-7006.conf --cluster-node-timeout 5000 --appendonly yes --protected-mode no --bind 0.0.0.0
+    ports:
+      - "7006:7006"
+      - "17006:17006"
+    volumes:
+      - redis-cluster-data-6:/data
+    networks:
+      - inventory-network
+    restart: unless-stopped
 
   # ==========================================
-  # 2. ZOOKEEPER (Kafka coordination)
+  # REDISINSIGHT UI (Redis Management)
+  # ==========================================
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: redisinsight
+    ports:
+      - "5540:5540"
+    volumes:
+      - redisinsight-data:/db
+    networks:
+      - inventory-network
+    environment:
+      - RI_SERVER_PORT=5540
+      - RI_REDIS_CLUSTER_NODES=redis-master-1:7001,redis-master-2:7002,redis-master-3:7003
+    restart: unless-stopped
+    depends_on:
+      - redis-master-1
+      - redis-master-2
+      - redis-master-3
+
+  # ==========================================
+  # ZOOKEEPER
   # ==========================================
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
@@ -64,7 +151,7 @@ services:
       retries: 5
 
   # ==========================================
-  # 3. KAFKA BROKER 1 (Port 9092)
+  # KAFKA BROKERS
   # ==========================================
   kafka1:
     image: confluentinc/cp-kafka:latest
@@ -101,9 +188,6 @@ services:
       - inventory-network
     restart: unless-stopped
 
-  # ==========================================
-  # 4. KAFKA BROKER 2 (Port 9093)
-  # ==========================================
   kafka2:
     image: confluentinc/cp-kafka:latest
     container_name: inventory-kafka-2
@@ -139,9 +223,6 @@ services:
       - inventory-network
     restart: unless-stopped
 
-  # ==========================================
-  # 5. KAFKA BROKER 3 (Port 9094)
-  # ==========================================
   kafka3:
     image: confluentinc/cp-kafka:latest
     container_name: inventory-kafka-3
@@ -178,32 +259,21 @@ services:
     restart: unless-stopped
 
   # ==========================================
-  # 6. YOUR NODE.JS APPLICATION (WITH DOCKERFILE)
+  # YOUR NODE.JS APPLICATION
   # ==========================================
   inventory-app:
     build: .
     container_name: inventory-app
     depends_on:
-      redis:
-        condition: service_healthy
       kafka1:
         condition: service_started
     environment:
-      # Redis configuration
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: naji12
-      
-      # Kafka configuration
-      KAFKA_BROKERS: "localhost:9092,localhost:9093,localhost:9094"
+      REDIS_CLUSTER_NODES: "redis-master-1:7001,redis-master-2:7002,redis-master-3:7003"
+      KAFKA_BROKERS: "kafka1:9092,kafka2:9093,kafka3:9094"
       KAFKA_USERNAME: najira
       KAFKA_PASSWORD: naji12
-      
-      # ZooKeeper
       ZOOKEEPER_HOST: zookeeper
       ZOOKEEPER_PORT: 2181
-      
-      # App
       NODE_ENV: production
     networks:
       - inventory-network
